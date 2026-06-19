@@ -1,0 +1,1 @@
+py -3.13 "c:/Users/peter/OneDrive - NTNU/Programmer/Weather test/app.py"

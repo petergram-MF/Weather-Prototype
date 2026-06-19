@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WeatherCal</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<style>
+:root { --sidebar:340px; --header:56px; }
+*,*::before,*::after{box-sizing:border-box;}
+html,body{height:100%;margin:0;background:#eef1f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+
+/* ── Header ── */
+#hdr{height:var(--header);background:#16213e;color:#fff;display:flex;align-items:center;gap:14px;padding:0 18px;box-shadow:0 2px 8px rgba(0,0,0,.35);flex-shrink:0;z-index:10;}
+#hdr h5{margin:0;font-weight:700;white-space:nowrap;letter-spacing:-.3px;}
+#loc-form{display:flex;gap:6px;}
+#loc-input{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:6px;padding:4px 12px;width:170px;font-size:.85rem;}
+#loc-input::placeholder{color:rgba(255,255,255,.45);}
+#loc-input:focus{outline:none;background:rgba(255,255,255,.2);}
+#hdr-badge{margin-left:auto;display:flex;align-items:center;gap:10px;}
+#hdr-badge .hb-emoji{font-size:1.5rem;line-height:1;}
+#hdr-badge .hb-temp{font-size:1.15rem;font-weight:700;}
+#hdr-badge .hb-loc{font-size:.75rem;opacity:.65;}
+.health-toggle-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);border-radius:6px;padding:4px 11px;font-size:.78rem;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.health-toggle-btn.active{background:rgba(108,99,255,.35);border-color:rgba(108,99,255,.7);color:#fff;}
+body.health-hidden .wx-alerts{display:none!important;}
+body.health-hidden .alert-banner{display:none!important;}
+
+/* ── Layout ── */
+#body{display:flex;height:calc(100vh - var(--header));overflow:hidden;}
+
+/* ── Sidebar ── */
+#sidebar{width:var(--sidebar);background:#fff;border-right:1px solid #dde3ec;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+#sb-top{padding:14px 14px 0;flex-shrink:0;}
+#cc-card{background:linear-gradient(135deg,#6c63ff,#3f3d56);border-radius:12px;padding:14px;color:#fff;text-align:center;}
+#cc-card .cc-emoji{font-size:2rem;line-height:1.1;}
+#cc-card .cc-cond{font-size:.8rem;opacity:.85;margin:2px 0 4px;}
+#cc-card .cc-temp{font-size:2rem;font-weight:700;line-height:1;}
+#cc-card .cc-details{display:flex;justify-content:center;gap:12px;font-size:.74rem;opacity:.8;margin-top:8px;}
+
+/* ── Chat panel ── */
+#weatherChat{flex:1;display:flex;flex-direction:column;overflow:hidden;margin:12px 14px 14px;border-radius:12px;border:1px solid #dde3ea;box-shadow:0 1px 4px rgba(0,0,0,.06);min-height:0;}
+.wc-header{display:flex;align-items:center;padding:9px 13px;flex-shrink:0;background:linear-gradient(135deg,#16213e 0%,#2d4a8a 60%,#6c63ff 100%);border-radius:11px 11px 0 0;}
+.wc-header-left{display:flex;align-items:center;gap:7px;color:rgba(255,255,255,.9);font-weight:600;font-size:12px;letter-spacing:.02em;}
+.wc-status-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.3);transition:background .3s;flex-shrink:0;}
+.wc-status-dot.active{background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,.6);}
+.wc-status-dot.loading{background:#fbbf24;animation:wcpulse .8s ease-in-out infinite;}
+@keyframes wcpulse{0%,100%{opacity:1}50%{opacity:.35}}
+.wc-body{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#fff;border-radius:0 0 11px 11px;min-height:0;}
+.wc-messages{flex:1;overflow-y:auto;padding:11px 13px 7px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth;min-height:0;}
+.wc-messages::-webkit-scrollbar{width:3px;}
+.wc-messages::-webkit-scrollbar-thumb{background:#ccd5de;border-radius:2px;}
+.wc-msg{max-width:92%;padding:8px 11px;border-radius:10px;line-height:1.5;font-size:12.5px;}
+.wc-msg.user{align-self:flex-end;background:#6c63ff;color:#fff;border-bottom-right-radius:3px;}
+.wc-msg.assistant{align-self:flex-start;background:#f8fafc;color:#1a2733;border:1px solid #dde3ea;border-bottom-left-radius:3px;}
+.wc-msg.error{align-self:flex-start;background:#fff0f0;color:#b91c1c;border:1px solid #fca5a5;}
+.wc-msg h3{font-size:12.5px;font-weight:700;margin:7px 0 2px;color:#1a2733;}
+.wc-msg h3:first-child{margin-top:0;}
+.wc-msg ul{margin:2px 0 4px 14px;padding:0;}
+.wc-msg li{margin:1px 0;}
+.wc-msg strong{font-weight:700;color:#16213e;}
+.wc-msg.user strong{color:#e8eaf6;}
+.wc-msg p{margin:0 0 4px;}
+.wc-msg p:last-child{margin-bottom:0;}
+.wc-msg hr{border:none;border-top:1px solid #e5e7eb;margin:6px 0;}
+.wc-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 12px;flex:1;}
+.wc-loading img{width:72px;height:72px;}
+.wc-loading span{color:#9aa5b1;font-size:11px;letter-spacing:.05em;text-transform:uppercase;}
+.wc-empty{text-align:center;color:#9aa5b1;font-size:12px;padding:20px 12px;line-height:1.6;}
+.wc-typing{display:flex;align-items:center;padding:4px 13px 8px;flex-shrink:0;}
+.wc-typing img{width:28px;height:28px;opacity:.85;}
+.wc-input-row{display:flex;gap:5px;padding:7px 9px 9px;border-top:1px solid #dde3ea;background:#fafbfc;flex-shrink:0;border-radius:0 0 11px 11px;}
+#wcInput{flex:1;padding:6px 10px;border:1px solid #dde3ea;border-radius:7px;font-size:12px;font-family:inherit;background:#fff;color:#1a2733;outline:none;transition:border-color .15s;}
+#wcInput:focus{border-color:#6c63ff;}
+#wcInput::placeholder{color:#9aa5b1;font-size:11px;}
+#wcSend{padding:6px 12px;background:#6c63ff;color:#fff;border:none;border-radius:7px;font-size:12px;font-family:inherit;font-weight:600;cursor:pointer;transition:background .15s;}
+#wcSend:hover:not(:disabled){background:#5a50d4;}
+#wcSend:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── Calendar area ── */
+#cal-wrap{flex:1;padding:14px;overflow:hidden;display:flex;flex-direction:column;}
+#calendar{flex:1;background:#fff;border-radius:12px;padding:10px 12px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden;}
+
+/* ── Panel layout ── */
+.tab-panel{flex:1;overflow-y:auto;display:none;flex-direction:column;min-height:0;padding-top:2px;}
+.tab-panel.active{display:flex;}
+
+/* ── FullCalendar ── */
+.fc{height:100%;}
+.fc .fc-toolbar-title{font-size:1rem;font-weight:700;color:#2d3748;}
+.fc .fc-button-primary{background:#6c63ff;border-color:#6c63ff;font-size:.8rem;}
+.fc .fc-button-primary:hover{background:#5a50d4;border-color:#5a50d4;}
+.fc .fc-button-primary:not(:disabled).fc-button-active{background:#4c47b8;border-color:#4c47b8;}
+.fc .fc-scroller-liquid-absolute{-ms-overflow-style:none;scrollbar-width:none;}
+.fc .fc-scroller-liquid-absolute::-webkit-scrollbar{display:none;}
+.fc .fc-col-header{background:linear-gradient(135deg,#16213e 0%,#1e3368 45%,#6c63ff 100%);}
+.fc .fc-col-header-cell{border-color:rgba(255,255,255,.1)!important;}
+.fc .fc-col-header-cell-cushion{color:rgba(255,255,255,.9)!important;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;text-decoration:none!important;padding:6px 4px 4px;display:flex;flex-direction:column;align-items:center;gap:1px;}
+.fc .fc-col-header-cell-cushion:hover{color:#fff!important;}
+.wh-wx{font-size:1rem;line-height:1;text-transform:none;letter-spacing:0;}
+.fc .fc-timegrid-slot{height:20px;border-color:#f0f3f7;}
+.fc .fc-timegrid-slot-minor{border-top-style:none!important;}
+.fc .fc-timegrid-slot-label{font-size:.65rem;color:#b0bec5;vertical-align:top;}
+.fc .fc-timegrid-slot-label-cushion{padding:0 6px;}
+.fc td,.fc th{border-color:#edf0f4;}
+.fc .fc-scrollgrid{border-color:#edf0f4;}
+.fc .fc-day-today{background:rgba(108,99,255,.03)!important;}
+.fc .fc-col-header-cell.fc-day-today{background:rgba(108,99,255,.25)!important;}
+.fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion{color:#fff!important;}
+.fc .fc-timegrid-now-indicator-line{border-color:#ef4444;border-width:1px;z-index:5;}
+.fc .fc-timegrid-now-indicator-arrow{border:none!important;width:8px;height:8px;background:#ef4444;border-radius:50%;margin-top:-4px;margin-left:-4px;}
+.fc .fc-timegrid-event{border-radius:4px!important;border:none!important;font-size:.72rem!important;padding:2px 4px!important;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.fc .act-event{font-size:.68rem!important;padding:1px 4px!important;border-radius:4px!important;}
+.fc .fc-daygrid-day-number{font-size:.8rem;color:#4a5568;padding:4px 6px;text-decoration:none;}
+.fc .fc-daygrid-day:hover{filter:brightness(.97);cursor:pointer;}
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number{color:#fff;font-weight:700;background:#6c63ff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;}
+.fc-quality-bar{position:absolute;left:0;top:0;bottom:0;width:3px;}
+.fc-wx{padding:1px 6px 5px;font-size:.68rem;color:#4a5568;display:flex;align-items:center;gap:3px;flex-wrap:wrap;line-height:1.3;}
+.fc-wx .wx-em{font-size:.9rem;}.fc-wx .wx-temp{font-weight:700;color:#2d3748;}.fc-wx .wx-rain{opacity:.65;}
+.wx-alerts{display:flex;gap:3px;flex-wrap:wrap;width:100%;margin-top:2px;}
+.wx-alert{font-size:.58rem;padding:1px 4px;border-radius:3px;font-weight:700;line-height:1.5;white-space:nowrap;}
+.wx-alert-pollen{background:#fef3c7;color:#92400e;}.wx-alert-uv{background:#fed7aa;color:#9a3412;}.wx-alert-humidity{background:#dbeafe;color:#1e40af;}
+.alert-banner{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;}
+.alert-tag{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:600;}
+.alert-tag-pollen{background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
+.alert-tag-uv{background:#fed7aa;color:#9a3412;border:1px solid #fb923c;}
+.alert-tag-humidity{background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;}
+
+/* ── Shared ── */
+#loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,.65);z-index:9999;align-items:center;justify-content:center;}
+.modal-content{border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.22);}
+.modal-header{background:linear-gradient(135deg,#16213e,#6c63ff);color:#fff;border-radius:14px 14px 0 0;padding:14px 18px;}
+.modal-header .btn-close{filter:invert(1);}
+.modal-title{font-size:.95rem;font-weight:600;}
+.hours-scroll{max-height:330px;overflow-y:auto;}
+.tr-good td{background:#d4edda!important;font-weight:500;}
+.score-row{margin-bottom:11px;}
+.score-row .sr-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;font-size:.82rem;}
+.sc-pill{font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:99px;}
+.sc-hi{background:#d4edda;color:#155724;}.sc-mid{background:#fff3cd;color:#856404;}.sc-lo{background:#f8d7da;color:#721c24;}
+.view-tabs{display:flex;gap:4px;flex-shrink:0;}
+.view-tab{padding:7px 16px;border-radius:8px 8px 0 0;border:1px solid #dde3ec;border-bottom:none;background:#dde3ec;color:#718096;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .15s;}
+.view-tab:hover{background:#edf2f7;color:#4a5568;}.view-tab.active{background:#fff;color:#2d3748;}
+.dest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.dur-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.dur-btn{padding:5px 12px;border-radius:99px;border:1.5px solid #e2e8f0;background:#fff;color:#718096;font-size:.75rem;font-weight:600;cursor:pointer;transition:all .15s;}
+.dur-btn:hover{border-color:#6c63ff;color:#6c63ff;}.dur-btn.active{border-color:#6c63ff;background:#6c63ff;color:#fff;}
+.dest-card{background:#fff;border-radius:14px;padding:14px;border:1.5px solid #e2e8f0;transition:all .15s;}
+.dest-card:hover{border-color:#6c63ff;box-shadow:0 4px 16px rgba(108,99,255,.12);}
+.dest-card.escape{background:#fffdf7;border-color:#f59e0b;}
+.dc-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.dc-emoji{font-size:1.8rem;line-height:1;}.dc-name{font-weight:700;font-size:.92rem;color:#2d3748;}.dc-country{font-size:.72rem;color:#718096;}
+.dc-weather{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;background:#f8fafc;margin-bottom:10px;font-size:.78rem;}
+.dc-dest-wx{color:#2d3748;flex:1;}.dc-vs{color:#a0aec0;font-size:.72rem;padding-top:3px;flex-shrink:0;}
+.dc-local-wx{color:#718096;flex:1;text-align:right;}.dc-local-wx.bad{color:#c05621;}
+.dc-flight{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;background:#f0eeff;margin-bottom:10px;font-size:.78rem;}
+.fl-price{font-weight:700;color:#6c63ff;font-size:.88rem;}.fl-info{text-align:right;color:#4a5568;}
+.dc-footer{display:flex;align-items:center;justify-content:space-between;}
+.weekend-tag{font-size:.7rem;font-weight:600;color:#6c63ff;background:#f0eeff;padding:3px 8px;border-radius:99px;}
+.escape-tag{font-size:.7rem;font-weight:600;color:#d97706;background:#fef3c7;padding:3px 8px;border-radius:99px;}
+.btn-all-fl{font-size:.72rem;color:#6c63ff;background:none;border:none;cursor:pointer;padding:0;}
+.dc-date{font-size:.72rem;color:#6c63ff;font-weight:600;margin-bottom:8px;}
+.day-strip{display:flex;gap:3px;margin-bottom:8px;flex-wrap:wrap;}
+.day-dot{font-size:.85rem;cursor:default;}
+.dur-badge{font-size:.65rem;font-weight:700;padding:2px 6px;border-radius:99px;background:#e9ecef;color:#495057;margin-left:5px;vertical-align:middle;}
+.evt-card{background:#fff;border-radius:14px;padding:14px;border:1.5px solid #e2e8f0;transition:all .15s;}
+.evt-card:hover{border-color:#6c63ff;box-shadow:0 4px 16px rgba(108,99,255,.1);}
+.evt-card.outdoor-good{background:#f6fef9;border-color:#86efac;}
+.evt-card.outdoor-mid{background:#fffdf0;border-color:#fde68a;}
+.evt-card.outdoor-poor{background:#fdf2f2;border-color:#fca5a5;}
+.evt-card.indoor{background:#f8f8ff;border-color:#c7d2fe;}
+.evt-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.evt-emoji{font-size:1.6rem;line-height:1;flex-shrink:0;}
+.evt-name{font-weight:700;font-size:.9rem;color:#2d3748;}.evt-meta{font-size:.72rem;color:#718096;margin-top:2px;}
+.evt-weather{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;background:#f8fafc;margin-bottom:10px;font-size:.78rem;color:#4a5568;}
+.evt-footer{display:flex;align-items:center;justify-content:space-between;}
+.evt-rec{font-size:.7rem;font-weight:600;padding:3px 9px;border-radius:99px;}
+.evt-badge-outdoor{font-size:.68rem;color:#15803d;font-weight:600;}
+.evt-badge-indoor{font-size:.68rem;color:#6c63ff;font-weight:600;}
+.hh-card{background:#fff;border-radius:12px;padding:12px;border:1.5px solid #e2e8f0;transition:all .15s;}
+.hh-card.garden-good{background:#f0fdf4;border-color:#86efac;}
+.hh-card:hover{box-shadow:0 3px 12px rgba(0,0,0,.07);}
+.hh-name{font-weight:700;font-size:.85rem;color:#2d3748;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.hh-time{font-size:.72rem;color:#6c63ff;font-weight:600;margin:3px 0;}
+.hh-deal{font-size:.72rem;color:#718096;margin-bottom:6px;}
+.hh-wx{font-size:.72rem;color:#4a5568;}
+.hh-garden-badge{font-size:.65rem;font-weight:600;color:#15803d;background:#dcfce7;padding:2px 6px;border-radius:99px;}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner-border text-primary" style="width:3rem;height:3rem"></div></div>
+
+<div style="display:flex;flex-direction:column;height:100vh">
+  <div id="hdr">
+    <h5>🌦️ WeatherCal</h5>
+    <form id="loc-form" onsubmit="submitLocation(event)">
+      <input id="loc-input" placeholder="City or lat,lon" value="Oslo">
+      <button class="btn btn-sm btn-primary" type="submit" style="font-size:.82rem">Search</button>
+    </form>
+    <button id="health-btn" class="health-toggle-btn active" onclick="toggleHealth()">🩺 Health alerts</button>
+    <div id="hdr-badge">
+      <span id="hb-emoji" class="hb-emoji"></span>
+      <div><div id="hb-temp" class="hb-temp">—</div><div id="hb-loc" class="hb-loc">—</div></div>
+    </div>
+  </div>
+
+  <div id="body">
+    <div id="sidebar">
+      <div id="sb-top">
+        <div id="cc-card">
+          <div id="cc-emoji" class="cc-emoji">—</div>
+          <div id="cc-cond" class="cc-cond">—</div>
+          <div id="cc-temp" class="cc-temp">—</div>
+          <div class="cc-details">
+            <span>💧 <span id="cc-rain">—</span>%</span>
+            <span>💨 <span id="cc-wind">—</span> m/s</span>
+            <span>☀️ UV <span id="cc-uv">—</span></span>
+            <span>💦 <span id="cc-humidity">—</span>%</span>
+          </div>
+        </div>
+      </div>
+      <div id="weatherChat">
+        <div class="wc-header">
+          <div class="wc-header-left">
+            <div class="wc-status-dot" id="wcDot"></div>
+            📰 Today's Brief
+          </div>
+        </div>
+        <div class="wc-body">
+          <div class="wc-messages" id="wcMessages">
+            <div class="wc-loading">
+              <img src="{{ url_for('static', filename='sun-loading.gif') }}" alt="Loading">
+              <span>Fetching your brief…</span>
+            </div>
+          </div>
+          <div class="wc-typing" id="wcTyping" style="display:none">
+            <img src="{{ url_for('static', filename='sun-loading.gif') }}" alt="thinking">
+          </div>
+          <div class="wc-input-row">
+            <input id="wcInput" type="text" placeholder="Ask anything about the weather…" autocomplete="off" disabled>
+            <button id="wcSend" disabled onclick="wcSendMsg()">Ask</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="cal-wrap">
+      <div class="view-tabs">
+        <button id="tab-cal"    class="view-tab active" onclick="switchTab('cal')">📅 Calendar</button>
+        <button id="tab-travel" class="view-tab"        onclick="switchTab('travel')">✈️ Travel</button>
+        <button id="tab-events" class="view-tab"        onclick="switchTab('events')">🎭 Events</button>
+      </div>
+      <div id="calendar"></div>
+      <div id="travel-panel" class="tab-panel">
+        <div class="d-flex justify-content-between align-items-start mb-3 pt-1">
+          <div><h6 class="fw-bold mb-1">✈️ Weekend Escape Finder</h6><small class="text-muted">Bad weather at home? Find sunshine abroad — mock flights included</small></div>
+          <button class="btn btn-sm btn-primary ms-3" onclick="loadTravel()" style="font-size:.78rem;flex-shrink:0">↻ Refresh</button>
+        </div>
+        <div class="dur-filters">
+          <button class="dur-btn active" data-dur="0" onclick="filterDuration(this)">All</button>
+          <button class="dur-btn" data-dur="3" onclick="filterDuration(this)">3-day break</button>
+          <button class="dur-btn" data-dur="5" onclick="filterDuration(this)">5-day trip</button>
+          <button class="dur-btn" data-dur="7" onclick="filterDuration(this)">7-day holiday</button>
+        </div>
+        <div id="travel-loading" style="display:none;text-align:center;padding:40px">
+          <div class="spinner-border text-primary mb-2"></div>
+          <div style="color:#718096;font-size:.85rem">Fetching forecasts…</div>
+        </div>
+        <div id="dest-grid" class="dest-grid"></div>
+      </div>
+      <div id="events-panel" class="tab-panel">
+        <div class="d-flex justify-content-between align-items-start mb-3 pt-1">
+          <div><h6 class="fw-bold mb-1">🎭 Events &amp; Experiences</h6><small class="text-muted">Weather-scored local events, concerts, sport &amp; happy hours</small></div>
+          <button class="btn btn-sm btn-primary ms-3" onclick="loadEvents()" style="font-size:.78rem;flex-shrink:0">↻ Refresh</button>
+        </div>
+        <div class="dur-filters" id="evt-filters">
+          <button class="dur-btn active" data-type="all"     onclick="filterEvents(this)">All</button>
+          <button class="dur-btn" data-type="football"       onclick="filterEvents(this)">⚽ Sport</button>
+          <button class="dur-btn" data-type="music"          onclick="filterEvents(this)">🎵 Music</button>
+          <button class="dur-btn" data-type="festival"       onclick="filterEvents(this)">🎪 Festivals</button>
+          <button class="dur-btn" data-type="happy_hour"     onclick="filterEvents(this)">🍺 Happy Hours</button>
+        </div>
+        <div id="events-loading" style="display:none;text-align:center;padding:40px">
+          <div class="spinner-border text-primary mb-2"></div>
+          <div style="color:#718096;font-size:.85rem">Scoring events against the forecast…</div>
+        </div>
+        <div id="events-grid" class="dest-grid" style="margin-bottom:28px"></div>
+        <div id="hh-section" style="display:none">
+          <h6 class="fw-bold mb-1" style="color:#2d3748;font-size:.85rem">🍺 Beer Garden &amp; Happy Hour Windows</h6>
+          <small class="text-muted d-block mb-3">Best weather windows for outdoor pub time this week</small>
+          <div id="hh-grid" class="dest-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Day modal -->
+<div class="modal fade" id="dayModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modal-title">—</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-alerts"></div>
+        <div class="row g-3">
+          <div class="col-md-5">
+            <h6 class="fw-bold mb-3" style="color:#2d3748">Activity suitability</h6>
+            <div id="modal-scores"><div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary"></div></div></div>
+          </div>
+          <div class="col-md-7">
+            <h6 class="fw-bold mb-1" style="color:#2d3748">Hour by hour <span class="fw-normal text-muted ms-1" style="font-size:.72rem">green = good outdoor window</span></h6>
+            <div class="hours-scroll">
+              <table class="table table-sm table-hover mb-0" id="modal-hours">
+                <thead class="table-light sticky-top"><tr><th>Time</th><th>Condition</th><th>°C</th><th>Rain</th><th>Wind</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Flights modal -->
+<div class="modal fade" id="flightsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-md">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="fl-title">Flights to —</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="fl-body"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+var SUN_GIF="{{ url_for('static', filename='sun-loading.gif') }}";
+'use strict';
+// ── State ──────────────────────────────────────────────────────────────────────
+var wxByDate={}, currentLoc='Oslo', travelRecs=null, eventsData=null, eventsHH=null;
+var activeEvtType='all', activeDurFilter=0;
+var calendar, dayModal, flightsModal;
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  dayModal     = new bootstrap.Modal(document.getElementById('dayModal'));
+  flightsModal = new bootstrap.Modal(document.getElementById('flightsModal'));
+  calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+    initialView:'timeGridWeek', height:'100%', scrollTime:'07:00:00',
+    nowIndicator:true, allDaySlot:false,
+    headerToolbar:{left:'prev,next today',center:'title',right:'dayGridMonth,timeGridWeek,timeGridDay'},
+    buttonText:{today:'Today',month:'Month',week:'Week',day:'Day'},
+    slotLabelFormat:{hour:'2-digit',minute:'2-digit',hour12:false},
+    slotLabelInterval:'01:00', eventMaxStack:2,
+    dayHeaderFormat:{weekday:'short',day:'numeric'},
+    eventSources:[{events:function(info,success,failure){
+      if(calendar&&calendar.view.type==='dayGridMonth'){success([]);return;}
+      fetch('/api/calendar-events?location='+encodeURIComponent(currentLoc))
+        .then(function(r){return r.json();})
+        .then(function(d){if(d.error){failure(d.error);return;}success(d.background.concat(d.activities));})
+        .catch(failure);
+    }}],
+    datesSet:function(info){
+      if(info.view.type==='dayGridMonth') setTimeout(applyWeatherOverlay,80);
+      else setTimeout(applyWeekHeaders,100);
+    },
+    dateClick:function(info){openDayModal(info.dateStr.substring(0,10));}
+  });
+  calendar.render();
+  loadWeather();
+  wcLoadBriefing(currentLoc);
+});
+
+// ── Weather ────────────────────────────────────────────────────────────────────
+function loadWeather(){
+  setLoading(true);
+  fetch('/api/forecast?location='+encodeURIComponent(currentLoc))
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.error){showAlert(data.error);return;}
+      wxByDate=data.days||{};
+      renderCurrentWidget(data.current,data.location);
+      if(calendar.view.type==='dayGridMonth') setTimeout(applyWeatherOverlay,80);
+      else{calendar.refetchEvents();setTimeout(applyWeekHeaders,300);}
+    })
+    .catch(function(e){showAlert('Network error: '+e.message);})
+    .finally(function(){setLoading(false);});
+}
+
+function applyWeatherOverlay(){
+  document.querySelectorAll('.fc-wx,.fc-quality-bar').forEach(function(el){el.remove();});
+  document.querySelectorAll('.fc-daygrid-day[data-date]').forEach(function(cell){
+    cell.style.backgroundColor='';
+    var w=wxByDate[cell.dataset.date]; if(!w) return;
+    cell.style.backgroundColor=w.color;
+    var bar=document.createElement('div'); bar.className='fc-quality-bar';
+    var avg=w.scores?Object.values(w.scores).reduce(function(a,b){return a+b;},0)/Object.values(w.scores).length:50;
+    bar.style.background=avg>=65?'linear-gradient(to bottom,#4ade80,#22c55e)':avg>=35?'linear-gradient(to bottom,#fbbf24,#f59e0b)':'linear-gradient(to bottom,#f87171,#ef4444)';
+    var frame=cell.querySelector('.fc-daygrid-day-frame');
+    if(frame){frame.style.position='relative';frame.appendChild(bar);}
+    var widget=document.createElement('div'); widget.className='fc-wx';
+    var a=w.alerts||{};
+    var ah=[a.pollen?'<span class="wx-alert wx-alert-pollen">🤧 Pollen</span>':'',a.uv_high?'<span class="wx-alert wx-alert-uv">🔆 UV</span>':'',a.humidity?'<span class="wx-alert wx-alert-humidity">💦 Humid</span>':''].filter(Boolean).join('');
+    widget.innerHTML='<span class="wx-em">'+w.emoji+'</span><span class="wx-temp">'+Math.round(w.temp_min)+'–'+Math.round(w.temp_max)+'°</span><span class="wx-rain">💧'+w.rain_prob+'%</span>'+(ah?'<div class="wx-alerts">'+ah+'</div>':'');
+    var top=cell.querySelector('.fc-daygrid-day-top');
+    if(frame&&top) frame.insertBefore(widget,top.nextSibling);
+  });
+}
+
+function applyWeekHeaders(){
+  document.querySelectorAll('.fc-col-header-cell[data-date]').forEach(function(cell){
+    var w=wxByDate[cell.dataset.date]; if(!w) return;
+    var cushion=cell.querySelector('.fc-col-header-cell-cushion');
+    if(!cushion||cushion.querySelector('.wh-wx')) return;
+    var em=document.createElement('span'); em.className='wh-wx'; em.textContent=w.emoji;
+    cushion.appendChild(em);
+  });
+}
+
+// ── Day modal ──────────────────────────────────────────────────────────────────
+function openDayModal(dateStr){
+  var w=wxByDate[dateStr];
+  var d=new Date(dateStr+'T12:00:00');
+  document.getElementById('modal-title').textContent=(w?w.emoji+' ':'')+d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})+(w?'  —  '+w.condition:'');
+  document.getElementById('modal-scores').innerHTML='<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
+  document.getElementById('modal-hours').querySelector('tbody').innerHTML='';
+  dayModal.show();
+  var alerts=w&&w.alerts||{};
+  var at=[alerts.pollen?'<span class="alert-tag alert-tag-pollen">🤧 High pollen</span>':'',alerts.uv_high?'<span class="alert-tag alert-tag-uv">🔆 High UV</span>':'',alerts.humidity?'<span class="alert-tag alert-tag-humidity">💦 High humidity</span>':''].filter(Boolean).join('');
+  document.getElementById('modal-alerts').innerHTML=at?'<div class="alert-banner">'+at+'</div>':'';
+  fetch('/api/day-detail?location='+encodeURIComponent(currentLoc)+'&date='+dateStr)
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.error){document.getElementById('modal-scores').innerHTML='<div class="text-danger">'+data.error+'</div>';return;}
+      document.getElementById('modal-scores').innerHTML=data.activities.map(function(a){
+        var bc=a.score>=70?'bg-success':a.score>=40?'bg-warning':'bg-danger';
+        var pc=a.score>=70?'sc-hi':a.score>=40?'sc-mid':'sc-lo';
+        return '<div class="score-row"><div class="sr-head"><span>'+a.emoji+' '+a.label+'</span><span class="sc-pill '+pc+'">'+a.score+'</span></div><div class="progress" style="height:6px;border-radius:3px"><div class="progress-bar '+bc+'" style="width:'+a.score+'%"></div></div></div>';
+      }).join('');
+      document.getElementById('modal-hours').querySelector('tbody').innerHTML=data.hours.map(function(h){
+        return '<tr class="'+(h.good?'tr-good':'')+'"><td>'+h.time+'</td><td>'+h.emoji+' '+h.condition+'</td><td>'+h.temp+'°C</td><td>'+h.rain_prob+'%</td><td>'+h.wind+' m/s</td></tr>';
+      }).join('');
+    });
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function renderCurrentWidget(c,loc){
+  if(!c) return;
+  document.getElementById('cc-emoji').textContent=c.emoji;
+  document.getElementById('cc-cond').textContent=c.condition;
+  document.getElementById('cc-temp').textContent=c.temp+'°C';
+  document.getElementById('cc-rain').textContent=c.rain_prob;
+  document.getElementById('cc-wind').textContent=c.wind;
+  document.getElementById('cc-uv').textContent=c.uv;
+  document.getElementById('cc-humidity').textContent=c.humidity;
+  document.getElementById('hb-emoji').textContent=c.emoji;
+  document.getElementById('hb-temp').textContent=c.temp+'°C';
+  document.getElementById('hb-loc').textContent=loc;
+}
+function submitLocation(e){
+  e.preventDefault();
+  var val=document.getElementById('loc-input').value.trim();
+  if(!val) return;
+  currentLoc=val; wxByDate={}; travelRecs=null; eventsData=null; eventsHH=null;
+  applyWeatherOverlay(); loadWeather(); wcLoadBriefing(currentLoc);
+  var tp=document.getElementById('travel-panel'), ep=document.getElementById('events-panel');
+  if(tp.classList.contains('active')) loadTravel();
+  if(ep.classList.contains('active')) loadEvents();
+}
+function setLoading(on){document.getElementById('loading').style.display=on?'flex':'none';}
+function showAlert(msg){
+  var el=document.createElement('div');
+  el.className='alert alert-danger alert-dismissible fade show';
+  el.style.cssText='position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9999;min-width:300px';
+  el.innerHTML=msg+'<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+  document.body.appendChild(el);
+  setTimeout(function(){el.remove();},6000);
+}
+function toggleHealth(){
+  document.body.classList.toggle('health-hidden');
+  document.getElementById('health-btn').classList.toggle('active');
+  if(calendar.view.type==='dayGridMonth') setTimeout(applyWeatherOverlay,50);
+}
+function switchTab(tab){
+  ['cal','travel','events'].forEach(function(t){
+    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
+  });
+  document.getElementById('calendar').style.display=tab==='cal'?'':'none';
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  if(tab!=='cal') document.getElementById(tab+'-panel').classList.add('active');
+  if(tab==='travel'&&!travelRecs) loadTravel();
+  if(tab==='events'&&!eventsData) loadEvents();
+}
+
+// ── Travel ─────────────────────────────────────────────────────────────────────
+function loadTravel(){
+  document.getElementById('dest-grid').innerHTML='';
+  document.getElementById('travel-loading').style.display='block';
+  fetch('/api/travel?location='+encodeURIComponent(currentLoc))
+    .then(function(r){return r.json();})
+    .then(function(data){if(data.error){showAlert(data.error);return;}travelRecs=data.recommendations;renderTravel(travelRecs);})
+    .catch(function(e){showAlert('Travel error: '+e.message);})
+    .finally(function(){document.getElementById('travel-loading').style.display='none';});
+}
+function filterDuration(btn){
+  document.querySelectorAll('.dur-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active'); activeDurFilter=parseInt(btn.dataset.dur);
+  if(travelRecs) renderTravel(travelRecs);
+}
+function renderTravel(recs){
+  var grid=document.getElementById('dest-grid');
+  if(!recs||!recs.length){grid.innerHTML='<div class="text-muted text-center py-4">No recommendations found.</div>';return;}
+  var filtered=activeDurFilter?recs.filter(function(r){return r.duration===activeDurFilter;}):recs;
+  if(!filtered.length){grid.innerHTML='<div class="text-muted text-center py-4">No results for this duration.</div>';return;}
+  grid.innerHTML=filtered.map(function(r){
+    var pc=r.score>=70?'sc-hi':r.score>=40?'sc-mid':'sc-lo';
+    var f=r.flights_out&&r.flights_out[0],lw=r.local_weather;
+    var ll=lw.temp_max!==null?lw.emoji+' '+lw.temp_max+'°C · '+lw.rain_prob+'% rain':lw.emoji+' typical';
+    var dots=(r.day_previews||[]).map(function(d){return '<span class="day-dot">'+d.emoji+'</span>';}).join('');
+    return '<div class="dest-card '+(r.bad_local?'escape':'')+'">'+
+      '<div class="dc-head"><span class="dc-emoji">'+r.emoji+'</span><div class="flex-grow-1"><div class="dc-name">'+r.destination+'<span class="dur-badge">'+r.duration_label+'</span></div><div class="dc-country">'+r.country+'</div></div><span class="sc-pill '+pc+'">'+r.score+'</span></div>'+
+      '<div class="dc-date">📅 '+r.date_range+'</div>'+(dots?'<div class="day-strip">'+dots+'</div>':'')+
+      '<div class="dc-weather"><div class="dc-dest-wx"><strong>'+r.dest_weather.emoji+' avg '+r.dest_weather.avg_temp+'°C</strong><div style="color:#718096;font-size:.7rem">'+r.dest_weather.condition+' · '+r.dest_weather.avg_rain+'% rain</div></div><div class="dc-vs">vs</div><div class="dc-local-wx '+(r.bad_local?'bad':'')+'"><strong>'+ll+'</strong><div style="font-size:.7rem">'+lw.condition+' locally</div></div></div>'+
+      (f?'<div class="dc-flight"><div><div class="fl-price">from £'+f.price.toLocaleString()+'</div><div style="color:#718096;font-size:.7rem">outbound · '+f.tier+'</div></div><div class="fl-info"><div>'+f.airline+'</div><div style="color:#718096;font-size:.7rem">'+f.duration+(f.stops?' · '+f.stops+(f.stops>1?' stops':' stop'):' · Direct')+'</div></div></div>':'')+
+      '<div class="dc-footer"><span class="'+(r.bad_local?'escape-tag':'weekend-tag')+'">'+(r.bad_local?'🚨 Escape!':'🌴 Great weather')+'</span><button class="btn-all-fl" onclick="showFlightsModal(\''+r.destination+'\',\''+r.start_date+'\')">Flights →</button></div></div>';
+  }).join('');
+}
+function showFlightsModal(destName,startDate){
+  var rec=travelRecs&&travelRecs.find(function(r){return r.destination===destName&&r.start_date===startDate;});
+  if(!rec) return;
+  function flightTable(flights,label){
+    return '<h6 class="fw-bold mt-3 mb-2" style="font-size:.82rem;color:#4a5568">'+label+'</h6>'+
+      flights.map(function(f,i){return '<div class="p-2 mb-1 rounded border '+(i===0?'border-primary':'')+'"><div class="d-flex align-items-center justify-content-between"><div><div class="fw-bold" style="font-size:.82rem">'+f.airline+' <span class="badge bg-secondary ms-1" style="font-size:.6rem">'+f.code+'</span>'+(i===0?'<span class="badge bg-success ms-1" style="font-size:.6rem">Best price</span>':'')+'</div><div style="font-size:.73rem;color:#718096">'+f.dep_time+' → '+f.arr_time+' · '+f.duration+(f.stops?' · '+f.stops+' stop via '+f.via:' · Direct')+'</div></div><div class="text-end"><div class="fw-bold text-primary">£'+f.price.toLocaleString()+'</div><div style="font-size:.68rem;color:#718096">'+f.tier+'</div></div></div></div>';}).join('');
+  }
+  document.getElementById('fl-title').textContent='✈️ '+rec.destination+', '+rec.country+' · '+rec.duration_label;
+  document.getElementById('fl-body').innerHTML='<div class="mb-2 text-muted" style="font-size:.82rem">📅 '+rec.date_range+' · From '+currentLoc+'</div>'+
+    '<div class="p-2 rounded mb-3" style="background:#f8fafc;font-size:.8rem">'+rec.emoji+' <strong>'+rec.destination+'</strong>: '+rec.dest_weather.emoji+' avg '+rec.dest_weather.avg_temp+'°C · '+rec.dest_weather.avg_rain+'% rain<div class="day-strip mt-1">'+
+    (rec.day_previews||[]).map(function(d){return '<span class="day-dot">'+d.emoji+'</span>';}).join('')+'</div></div>'+
+    flightTable(rec.flights_out||[],'✈️ Outbound — '+rec.start_date)+
+    flightTable(rec.flights_ret||[],'🔁 Return — '+rec.end_date)+
+    '<div class="text-muted mt-3" style="font-size:.67rem">⚠️ Mock data — prices and schedules are simulated</div>';
+  flightsModal.show();
+}
+
+// ── Events ─────────────────────────────────────────────────────────────────────
+function loadEvents(){
+  document.getElementById('events-grid').innerHTML='';
+  document.getElementById('hh-grid').innerHTML='';
+  document.getElementById('hh-section').style.display='none';
+  document.getElementById('events-loading').style.display='block';
+  fetch('/api/events?location='+encodeURIComponent(currentLoc))
+    .then(function(r){return r.json();})
+    .then(function(data){if(data.error){showAlert(data.error);return;}eventsData=data.events;eventsHH=data.happy_hours;renderEvents(eventsData,eventsHH);})
+    .catch(function(e){showAlert('Events error: '+e.message);})
+    .finally(function(){document.getElementById('events-loading').style.display='none';});
+}
+function filterEvents(btn){
+  document.querySelectorAll('#evt-filters .dur-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active'); activeEvtType=btn.dataset.type;
+  if(eventsData) renderEvents(eventsData,eventsHH);
+}
+function renderEvents(events,happyHours){
+  var grid=document.getElementById('events-grid');
+  if(activeEvtType==='happy_hour'){grid.innerHTML='';document.getElementById('hh-section').style.display='block';renderHappyHours(happyHours);return;}
+  var filtered=activeEvtType==='all'?events:events.filter(function(e){return e.type===activeEvtType||(activeEvtType==='festival'&&(e.type==='festival'||e.type==='market'));});
+  grid.innerHTML=filtered.length?filtered.map(function(e){
+    var pc=e.score>=70?'sc-hi':e.score>=45?'sc-mid':'sc-lo';
+    var cc=e.outdoor?(e.score>=70?'outdoor-good':e.score>=45?'outdoor-mid':'outdoor-poor'):'indoor';
+    var rec=e.recommendation;
+    return '<div class="evt-card '+cc+'"><div class="evt-head"><span class="evt-emoji">'+e.emoji+'</span><div class="flex-grow-1"><div class="evt-name">'+e.name+'</div><div class="evt-meta">'+e.day_name+' · '+e.time+' · '+e.duration+'</div></div><span class="sc-pill '+pc+'">'+e.score+'</span></div>'+
+      '<div class="evt-weather">'+e.weather.emoji+' '+e.weather.temp+'°C <span style="opacity:.5">·</span> 💧'+e.weather.rain_prob+'% <span style="opacity:.5">·</span> 💨'+e.weather.wind+' m/s</div>'+
+      '<div class="evt-footer"><span class="evt-rec" style="background:'+rec.color+';color:'+rec.text+'">'+rec.label+'</span><span class="'+(e.outdoor?'evt-badge-outdoor':'evt-badge-indoor')+'">'+(e.outdoor?'🌿 Outdoor':'🏛️ Indoor')+'</span></div></div>';
+  }).join(''):'<div class="text-muted text-center py-4">No events for this filter.</div>';
+  document.getElementById('hh-section').style.display=activeEvtType==='all'?'block':'none';
+  if(activeEvtType==='all') renderHappyHours(happyHours);
+}
+function renderHappyHours(windows){
+  var grid=document.getElementById('hh-grid');
+  if(!windows||!windows.length){grid.innerHTML='<div class="text-muted text-center py-3">No happy hour data.</div>';return;}
+  grid.innerHTML=windows.map(function(w){
+    return '<div class="hh-card '+(w.score>=60&&w.beer_garden?'garden-good':'')+'">'+
+      '<div class="hh-name">'+w.emoji+' '+w.pub+(w.beer_garden?' <span class="hh-garden-badge">🌿 Beer garden</span>':'')+'</div>'+
+      '<div class="hh-time">'+w.day_name+' · '+w.time+'</div>'+
+      '<div class="hh-deal">'+w.deal+'</div>'+
+      '<div class="hh-wx">🌡️ '+w.weather.temp+'°C · 💧'+w.weather.rain_prob+'% rain'+(w.outdoor_viable?' <strong style="color:#15803d">☀️ Get outside!</strong>':'')+'</div></div>';
+  }).join('');
+}
+
+// ── Weather Chat ───────────────────────────────────────────────────────────────
+var wcLoc='', wcHistory=[], wcBusy=false;
+
+function wcRenderMd(text){
+  var lines=text.split('\n'),html='',inList=false;
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i];
+    if(/^#{1,3}\s/.test(line)){if(inList){html+='</ul>';inList=false;}html+='<h3>'+wcFmt(line.replace(/^#+\s*/,''))+'</h3>';}
+    else if(/^[\-\*]\s/.test(line)){if(!inList){html+='<ul>';inList=true;}html+='<li>'+wcFmt(line.replace(/^[\-\*]\s/,''))+'</li>';}
+    else if(/^---+$/.test(line.trim())){if(inList){html+='</ul>';inList=false;}html+='<hr>';}
+    else if(line.trim()===''){if(inList){html+='</ul>';inList=false;}}
+    else{if(inList){html+='</ul>';inList=false;}html+='<p>'+wcFmt(line)+'</p>';}
+  }
+  if(inList) html+='</ul>';
+  return html;
+}
+function wcFmt(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>');
+}
+function wcMsg(msgs,role,text){
+  var div=document.createElement('div');
+  div.className='wc-msg '+role;
+  div.innerHTML=role==='assistant'?wcRenderMd(text):wcFmt(text);
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+function wcErr(msgs,msg){
+  var div=document.createElement('div');
+  div.className='wc-msg error';
+  div.textContent='⚠️ '+msg;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function wcLoadBriefing(location){
+  if(!location) return;
+  wcLoc=location; wcHistory=[];
+  var msgs=document.getElementById('wcMessages');
+  var dot =document.getElementById('wcDot');
+  var inp =document.getElementById('wcInput');
+  var snd =document.getElementById('wcSend');
+  if(!msgs||!dot||!inp||!snd){console.error('Chat elements missing');return;}
+  msgs.innerHTML='<div class="wc-loading"><img src="'+SUN_GIF+'" alt="Loading"><span>Fetching your brief…</span></div>';
+  inp.disabled=true; snd.disabled=true;
+  dot.className='wc-status-dot loading';
+  wcBusy=true;
+  var msgEl=null, fullText='';
+  fetch('/api/agent-stream?location='+encodeURIComponent(location))
+    .then(function(response){
+      var reader=response.body.getReader(), decoder=new TextDecoder(), buffer='';
+      function read(){
+        return reader.read().then(function(result){
+          if(result.done){
+            if(msgEl&&fullText) msgEl.innerHTML=wcRenderMd(fullText);
+            wcHistory.push({role:'assistant',text:fullText});
+            dot.className='wc-status-dot active';
+            inp.disabled=false; snd.disabled=false; inp.focus();
+            wcBusy=false; return;
+          }
+          buffer+=decoder.decode(result.value,{stream:true});
+          var lines=buffer.split('\n'); buffer=lines.pop();
+          for(var i=0;i<lines.length;i++){
+            var line=lines[i];
+            if(!line.startsWith('data: ')) continue;
+            var raw=line.slice(6).trim();
+            if(raw==='[DONE]') continue;
+            try{
+              var d=JSON.parse(raw);
+              if(d.error){msgs.innerHTML='';wcErr(msgs,d.error);dot.className='wc-status-dot';inp.disabled=false;snd.disabled=false;wcBusy=false;return;}
+              if(d.text){
+                if(!msgEl){msgs.innerHTML='';msgEl=document.createElement('div');msgEl.className='wc-msg assistant';msgs.appendChild(msgEl);}
+                fullText+=d.text; msgEl.textContent=fullText; msgs.scrollTop=msgs.scrollHeight;
+              }
+            }catch(e){}
+          }
+          return read();
+        });
+      }
+      return read();
+    })
+    .catch(function(err){
+      msgs.innerHTML=''; wcErr(msgs,'Could not load brief: '+err.message);
+      dot.className='wc-status-dot'; inp.disabled=false; snd.disabled=false; wcBusy=false;
+    });
+}
+function wcTypewriter(text,el,msgs,cb){
+  var parts=text.split(/(\s+)/),i=0,partial='';
+  function step(){
+    if(i>=parts.length){
+      el.innerHTML=wcRenderMd(text);
+      msgs.scrollTop=msgs.scrollHeight;
+      if(cb) cb();
+      return;
+    }
+    partial+=parts[i++];
+    el.textContent=partial;
+    msgs.scrollTop=msgs.scrollHeight;
+    setTimeout(step,18);
+  }
+  step();
+}
+
+function wcSendMsg(){
+  var inp=document.getElementById('wcInput');
+  var snd=document.getElementById('wcSend');
+  var msgs=document.getElementById('wcMessages');
+  var dot=document.getElementById('wcDot');
+  var text=inp.value.trim();
+  if(!text||wcBusy) return;
+  inp.value='';
+  wcMsg(msgs,'user',text);
+  wcHistory.push({role:'user',text:text});
+  wcBusy=true; inp.disabled=true; snd.disabled=true;
+  dot.className='wc-status-dot loading';
+  document.getElementById('wcTyping').style.display='flex';
+  msgs.scrollTop=msgs.scrollHeight;
+  fetch('/api/agent-chat',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({location:wcLoc,message:text,history:wcHistory.slice(0,-1)})})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.error) throw new Error(data.error);
+      document.getElementById('wcTyping').style.display='none';
+      var msgEl=document.createElement('div');msgEl.className='wc-msg assistant';msgs.appendChild(msgEl);
+      var respText=data.text;
+      wcTypewriter(respText,msgEl,msgs,function(){
+        wcHistory.push({role:'assistant',text:respText});
+        dot.className='wc-status-dot active';
+        inp.disabled=false; snd.disabled=false; inp.focus();
+        wcBusy=false;
+      });
+    })
+    .catch(function(err){
+      document.getElementById('wcTyping').style.display='none';
+      wcErr(msgs,'Something went wrong: '+err.message);
+      wcHistory.pop();
+      dot.className='wc-status-dot active';
+      inp.disabled=false; snd.disabled=false;
+      wcBusy=false;
+    });
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('wcInput').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();wcSendMsg();}
+  });
+});
+</script>
+</body>
+</html>
